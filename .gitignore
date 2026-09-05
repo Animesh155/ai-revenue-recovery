@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.DS_Store
+.env
+.env.*
+!.env.example
+runs/
+cases/
+batches/*/cases/
+batches/*/runs/
+batches/*/audit.log
+batches/*/events.jsonl
+*.db
+.venv/
+node_modules/

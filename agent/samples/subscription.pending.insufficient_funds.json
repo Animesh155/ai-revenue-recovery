@@ -1,0 +1,22 @@
+{
+  "event": "subscription.pending",
+  "payload": {
+    "subscription": {
+      "entity": {
+        "id": "sub_sample_insufficient_funds",
+        "status": "pending",
+        "plan_id": "plan_monthly_999"
+      }
+    },
+    "payment": {
+      "entity": {
+        "id": "pay_sample_failed_001",
+        "amount": 99900,
+        "currency": "INR",
+        "status": "failed",
+        "method": "card",
+        "error_description": "Your account has insufficient balance to complete this transaction"
+      }
+    }
+  }
+}

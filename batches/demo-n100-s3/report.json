@@ -1,0 +1,205 @@
+{
+  "batch_id": "demo-n100-s3",
+  "outcome_source": "synthetic_declared",
+  "generated_at": "2026-09-04T14:41:28+05:30",
+  "n_cases": 100,
+  "amount_at_risk_paise": 11625000,
+  "recovered_total_paise": 2861300,
+  "recovered_rate": 0.2461,
+  "recovered_by_attribution_paise": {
+    "agent_attributed": 1627700,
+    "organic": 119800,
+    "gateway_attributed": 1113800
+  },
+  "recovered_cases_by_attribution": {
+    "agent_attributed": 23,
+    "organic": 2,
+    "gateway_attributed": 12
+  },
+  "cost_paise": 74400,
+  "net_agent_contribution_paise": 1553300,
+  "contacts_per_agent_recovery": 1.57,
+  "constraint_violations": 0,
+  "by_decline_class": {
+    "insufficient_funds": {
+      "n": 30,
+      "at_risk": 2067000,
+      "recovered_total": 1063800,
+      "agent_attributed": 269700,
+      "gateway_attributed": 794100,
+      "organic": 0,
+      "cost": 2975
+    },
+    "unknown": {
+      "n": 1,
+      "at_risk": 199900,
+      "recovered_total": 0,
+      "agent_attributed": 0,
+      "gateway_attributed": 0,
+      "organic": 0,
+      "cost": 5000
+    },
+    "do_not_honour": {
+      "n": 22,
+      "at_risk": 5247800,
+      "recovered_total": 459300,
+      "agent_attributed": 119700,
+      "gateway_attributed": 319700,
+      "organic": 19900,
+      "cost": 23060
+    },
+    "risk_afa_required": {
+      "n": 5,
+      "at_risk": 519500,
+      "recovered_total": 419600,
+      "agent_attributed": 419600,
+      "gateway_attributed": 0,
+      "organic": 0,
+      "cost": 335
+    },
+    "mandate_cancelled": {
+      "n": 6,
+      "at_risk": 539400,
+      "recovered_total": 69800,
+      "agent_attributed": 69800,
+      "gateway_attributed": 0,
+      "organic": 0,
+      "cost": 10935
+    },
+    "checkout_abandoned": {
+      "n": 8,
+      "at_risk": 754200,
+      "recovered_total": 0,
+      "agent_attributed": 0,
+      "gateway_attributed": 0,
+      "organic": 0,
+      "cost": 10330
+    },
+    "risk_card_expiring": {
+      "n": 9,
+      "at_risk": 959100,
+      "recovered_total": 169700,
+      "agent_attributed": 169700,
+      "gateway_attributed": 0,
+      "organic": 0,
+      "cost": 5765
+    },
+    "card_expired": {
+      "n": 5,
+      "at_risk": 289500,
+      "recovered_total": 99900,
+      "agent_attributed": 99900,
+      "gateway_attributed": 0,
+      "organic": 0,
+      "cost": 525
+    },
+    "invoice_due_soon": {
+      "n": 6,
+      "at_risk": 259400,
+      "recovered_total": 159600,
+      "agent_attributed": 159600,
+      "gateway_attributed": 0,
+      "organic": 0,
+      "cost": 80
+    },
+    "invoice_overdue": {
+      "n": 5,
+      "at_risk": 619500,
+      "recovered_total": 299800,
+      "agent_attributed": 199900,
+      "gateway_attributed": 0,
+      "organic": 99900,
+      "cost": 15175
+    },
+    "risk_mandate_expiring": {
+      "n": 3,
+      "at_risk": 169700,
+      "recovered_total": 119800,
+      "agent_attributed": 119800,
+      "gateway_attributed": 0,
+      "organic": 0,
+      "cost": 220
+    }
+  },
+  "by_origin": {
+    "webhook": {
+      "n": 64,
+      "at_risk": 8343600,
+      "recovered_total": 1692800,
+      "agent_attributed": 559100,
+      "gateway_attributed": 1113800,
+      "organic": 19900,
+      "cost": 42495
+    },
+    "detector": {
+      "n": 36,
+      "at_risk": 3281400,
+      "recovered_total": 1168500,
+      "agent_attributed": 1068600,
+      "gateway_attributed": 0,
+      "organic": 99900,
+      "cost": 31905
+    }
+  },
+  "by_domain": {
+    "recurring": {
+      "n": 81,
+      "at_risk": 9991900,
+      "recovered_total": 2401900,
+      "agent_attributed": 1268200,
+      "gateway_attributed": 1113800,
+      "organic": 19900,
+      "cost": 48815
+    },
+    "checkout": {
+      "n": 8,
+      "at_risk": 754200,
+      "recovered_total": 0,
+      "agent_attributed": 0,
+      "gateway_attributed": 0,
+      "organic": 0,
+      "cost": 10330
+    },
+    "receivables": {
+      "n": 11,
+      "at_risk": 878900,
+      "recovered_total": 459400,
+      "agent_attributed": 359500,
+      "gateway_attributed": 0,
+      "organic": 99900,
+      "cost": 15255
+    }
+  },
+  "by_terminal_status": {
+    "noop_closed": 14,
+    "human": 13,
+    "stopped_tiers": 35,
+    "recovered": 37,
+    "stopped_ev": 1
+  },
+  "recovered_cases_by_last_action": {
+    "mandate_reregister": 13,
+    "defer_to_gateway": 12,
+    "dunning_whatsapp": 2,
+    "dunning_email": 10
+  },
+  "recovered_amount_by_last_action_paise": {
+    "mandate_reregister": 978700,
+    "defer_to_gateway": 1113800,
+    "dunning_whatsapp": 199800,
+    "dunning_email": 569000
+  },
+  "provenance": {
+    "p_recover": "prior (validated:false) from policy.escalation-path.json; replaced by measured where n >= 200",
+    "outcomes": "synthetic_declared",
+    "attribution_window_hours": 72.0
+  },
+  "seed": 3,
+  "events_processed": 365,
+  "runtime_stats": {
+    "events": 365,
+    "violations": 0,
+    "actions": 278
+  },
+  "declared_model": "/Users/animeshswet/razorpay exp/batches/demo-n100-s3/declared-outcome-model.json"
+}

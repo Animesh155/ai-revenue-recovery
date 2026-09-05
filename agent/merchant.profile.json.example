@@ -1,0 +1,20 @@
+{
+  "merchant_id": "merchant_example",
+  "gateway": "razorpay",
+  "integration": "subscriptions",
+  "rails": ["card", "upi"],
+  "retry_owner": "gateway",
+  "environment": "sandbox",
+  "billing_anchor": "fixed_dom",
+  "typical_bill_days": [10],
+  "recovery_horizon_days": 21,
+  "has_sandbox_keys": false,
+  "has_webhook_endpoint": false,
+  "has_failure_logs": false,
+  "customer_payday_hint_dom": [1, 15],
+  "enabled_features": {
+    "razorpay_intelligent_retry_engine": false,
+    "razorpay_whatsapp_recovery": false,
+    "custom_webhook_handler": false
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NormalizedEvent",
+  "type": "object",
+  "required": ["event_type", "gateway", "occurred_at"],
+  "properties": {
+    "event_type": { "type": "string" },
+    "gateway": { "type": "string", "enum": ["razorpay", "stripe", "cashfree"] },
+    "subscription_id": { "type": "string" },
+    "payment_id": { "type": "string" },
+    "invoice_id": { "type": "string" },
+    "amount_paise": { "type": "integer" },
+    "currency": { "type": "string" },
+    "rail": { "type": "string", "enum": ["card", "upi", "netbanking", "unknown"] },
+    "error_description": { "type": "string" },
+    "mandate_status": { "type": "string" },
+    "occurred_at": { "type": "string", "format": "date-time" }
+  }
+}

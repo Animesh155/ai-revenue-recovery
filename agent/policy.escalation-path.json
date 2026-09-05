@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "purpose": "Path optimizer. Among actions the SHIELD (constraints.json) leaves feasible, choose the CHEAPEST action with positive expected value; escalate across ticks; stop on EV-floor or horizon. Sits INSIDE the shield and never re-enables a blocked action.",
+  "meta": {
+    "objective": "maximize E[recovered_paise] - retry_cost - comms_cost, subject to constraints.json. The churn-cost term is intentionally OMITTED: it is counterfactual and unmeasurable now (see spikes/constraint-path-optimization README feasibility section). Harassment is bounded structurally by the comms frequency/gap constraints in the shield, not by a cost term.",
+    "selection_rule": "cost_ordered_positive_ev",
+    "selection_rule_detail": "EV(a) = p_recover(decline_class, a, attempt_index) * amount_paise - cost_paise(a). Keep feasible actions with EV>0 not already in case.tiers_attempted. Pick the CHEAPEST (lowest tier order). Not argmax-EV: cost order is a decision we trust; the magnitude of p_recover is not. Escalate to the next tier only on a later tick after the cheaper tier failed.",
+    "ev_floor_stop": "If no feasible action has p_recover*amount_paise > cost_paise, STOP the case (status stopped_ev).",
+    "horizon_days": 21,
+    "attempt_index": "0-based count of prior money-moving attempts for money-moving actions, or prior touches of that channel for contact actions. Clamp to last element of the prior array.",
+    "provenance": "EVERY p_recover value below is a CONSERVATIVE PRIOR with validated:false. These are placeholders to make the arithmetic runnable, NOT measured performance. Replace cell-by-cell with recovered/attempted from audit data once a cell reaches min_n. DO NOT quote these as results.",
+    "validated": false,
+    "min_n_to_replace_prior": 200
+  },
+
+  "tiers": [
+    { "order": 0, "action": "defer_to_gateway",  "class": "money_moving", "cost_paise": 0,    "max_uses": 3, "latency_hours": 24, "note": "Gateway-owned retry (T+1/2/3). Free. Preferred when retry_owner=gateway." },
+    { "order": 1, "action": "schedule_retry",     "class": "money_moving", "cost_paise": 0,    "max_uses": 3, "latency_hours": 24, "note": "Merchant-owned retry. Executing it = send pre-debit notice now, debit at +24h. Scheme re-presentment risk bounded by the shield's network cap." },
+    { "order": 2, "action": "dunning_email",      "class": "contact",      "cost_paise": 10,   "max_uses": 2, "latency_hours": 48, "channel": "email",    "note": "Transactional email. Cheap, TRAI-exempt, survives DND/quiet-hours." },
+    { "order": 3, "action": "dunning_whatsapp",   "class": "contact",      "cost_paise": 85,   "max_uses": 2, "latency_hours": 48, "channel": "whatsapp", "note": "WhatsApp utility template. Subject to DND, quiet-hours, freq caps in shield." },
+    { "order": 4, "action": "mandate_reregister", "class": "contact",      "cost_paise": 85,   "max_uses": 2, "latency_hours": 72, "channel": "whatsapp", "transactional": true, "note": "Customer-action request (re-auth / AFA). The ONLY progress path when shield returns require_action. Transactional: survives DND-unknown." },
+    { "order": 5, "action": "escalate_human",     "class": "terminal",     "cost_paise": 5000, "max_uses": 1, "terminal": true, "note": "Ops review. Clears EV floor only for high-value cases." },
+    { "order": 6, "action": "noop",               "class": "terminal",     "cost_paise": 0,    "max_uses": 99, "terminal": true, "note": "Do nothing (duplicate/idempotent or nothing feasible)." }
+  ],
+  "tier_fields": {
+    "max_uses": "Max times this tier may be chosen per case. Escalation moves to the next tier once exhausted or after each failed use.",
+    "latency_hours": "How long after executing before an outcome is expected; sets case.next_eligible_at (the next tick)."
+  },
+
+  "priors": {
+    "_comment": "p_recover[decline_class][action] = array indexed by attempt_index (clamped). validated:false. Conservative by construction.",
+    "insufficient_funds": {
+      "defer_to_gateway":   [0.30, 0.18, 0.09],
+      "schedule_retry":     [0.32, 0.18, 0.09],
+      "dunning_whatsapp":   [0.15, 0.10],
+      "dunning_email":      [0.08, 0.05],
+      "mandate_reregister": [0.10, 0.05]
+    },
+    "card_expired": {
+      "schedule_retry":     [0.0],
+      "defer_to_gateway":   [0.0],
+      "dunning_email":      [0.10, 0.06],
+      "dunning_whatsapp":   [0.18, 0.11],
+      "mandate_reregister": [0.22, 0.13]
+    },
+    "mandate_cancelled": {
+      "mandate_reregister": [0.18, 0.10]
+    },
+    "retries_exhausted": {
+      "dunning_whatsapp":   [0.12, 0.07],
+      "mandate_reregister": [0.15, 0.09],
+      "dunning_email":      [0.06, 0.04]
+    },
+    "do_not_honour": {
+      "defer_to_gateway":   [0.12, 0.07],
+      "dunning_whatsapp":   [0.10, 0.06],
+      "mandate_reregister": [0.12, 0.07]
+    },
+    "unknown": {
+      "escalate_human": [0.0]
+    },
+
+    "_pre_failure_comment": "Detector-originated recurring classes (decline_family=pre_failure). 'Recovery' = the scheduled charge succeeds. Money-moving is shield-blocked. validated:false.",
+    "risk_card_expiring": {
+      "dunning_email":      [0.30, 0.15],
+      "dunning_whatsapp":   [0.40, 0.20],
+      "mandate_reregister": [0.45, 0.25]
+    },
+    "risk_mandate_expiring": {
+      "dunning_email":      [0.25, 0.10],
+      "mandate_reregister": [0.40, 0.20]
+    },
+    "risk_mandate_max_breach": {
+      "dunning_email":      [0.20, 0.10],
+      "mandate_reregister": [0.35, 0.15]
+    },
+    "risk_afa_required": {
+      "dunning_email":      [0.50, 0.25],
+      "dunning_whatsapp":   [0.55, 0.30]
+    },
+
+    "_non_recurring_comment": "Checkout + receivables domains. No mandate; contact-only. validated:false.",
+    "checkout_abandoned": {
+      "dunning_email":    [0.06, 0.03],
+      "dunning_whatsapp": [0.10, 0.05]
+    },
+    "invoice_due_soon": {
+      "dunning_email":    [0.35, 0.15],
+      "dunning_whatsapp": [0.30, 0.15]
+    },
+    "invoice_overdue": {
+      "dunning_email":    [0.20, 0.10],
+      "dunning_whatsapp": [0.25, 0.12],
+      "escalate_human":   [0.30]
+    }
+  },
+
+  "defaults": {
+    "prior_when_missing": 0.05,
+    "unknown_decline_action": "escalate_human",
+    "attempt_index_clamp": "use_last_element",
+    "note": "If (decline_class, action) has no prior, use prior_when_missing so the arithmetic still runs but the cell is flagged for instrumentation."
+  }
+}

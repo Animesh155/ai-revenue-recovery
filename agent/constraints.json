@@ -1,0 +1,302 @@
+{
+  "version": 1,
+  "purpose": "Feasible-region definition for India recurring-payment recovery. Constraints are hard, sourced, and non-overridable. They define what the agent is FORBIDDEN or REQUIRED to do. Policy (policy.decline-actions.json) only picks among actions this catalog leaves ALLOWED.",
+  "meta": {
+    "verdicts": {
+      "block": "Action is forbidden. Remove from feasible set.",
+      "require_action": "No auto-recovery is possible. Event collapses to a customer-action path (re-register / AFA). Blocks all money-moving actions.",
+      "defer": "Do not act yet. A timing window is unelapsed or another owner (gateway) will act. Re-evaluate later.",
+      "allow": "Passes this constraint."
+    },
+    "action_taxonomy": {
+      "money_moving": ["schedule_retry", "defer_to_gateway"],
+      "contact": ["dunning_email", "dunning_whatsapp", "mandate_reregister"],
+      "terminal": ["escalate_human", "noop"]
+    },
+    "channel_map": {
+      "dunning_email": "email",
+      "dunning_whatsapp": "whatsapp",
+      "mandate_reregister": "whatsapp"
+    },
+    "evaluation": {
+      "order": "Evaluate constraints top-to-bottom by group: domain_scope -> consent_fraud -> mandate_lifecycle -> rbi_emandate -> scheme_rail -> comms_trai -> idempotency_stopping. Deny always wins. A single require_action collapses the event to customer-action. mandate_* groups only apply to domain=recurring (checkout/receivables carry mandate_status=n/a).",
+      "feasible_set_algorithm": "Start with all actions allowed. Apply each constraint whose `when` matches. Remove every action in `blocks_actions`. Record each firing in feasible.json with its id + source. Output: feasible actions + vetoes.",
+      "timezone": "All time conditions evaluated in IST (UTC+05:30) against the intended action time, not occurred_at."
+    },
+    "unknown_handling": {
+      "principle": "Fail closed. Missing data never unlocks a money-moving or promotional action.",
+      "rules": [
+        "mandate_status unknown -> treat as require_action (cannot prove debit authority). CLASSIFY must first infer it from subscription/event status (pending->active, halted->halted, cancelled->cancelled) so this only fires when truly unknown (F2).",
+        "pre_debit_notice_sent unknown -> block schedule_retry only (cannot prove 24h notice for a merchant-initiated debit). defer_to_gateway exempt (F1).",
+        "customer_dnd unknown -> block promotional whatsapp (dunning_whatsapp); allow email + transactional whatsapp (mandate_reregister).",
+        "fraud_flag unknown -> allow (absence is not a positive flag), but log.",
+        "amount_paise unknown -> block money_moving above-threshold checks cannot be cleared."
+      ]
+    },
+    "field_sources": {
+      "normalized_event": ["event_type", "amount_paise", "rail", "mandate_status", "error_description", "payment_id", "occurred_at"],
+      "classification": ["decline_class", "decline_family", "domain", "mandate_category"],
+      "merchant_profile": ["retry_owner", "rails", "enabled_features"],
+      "context_derived": ["pre_debit_notice_sent", "pre_debit_sent_at", "hours_since_last_failed_debit", "customer_dnd", "customer_opted_out", "fraud_flag", "contacts_last_7d", "hours_since_last_contact", "card_network", "network_retries_30d", "attempts_used", "processed_payment_ids"]
+    }
+  },
+
+  "constraints": [
+    {
+      "id": "pre_failure_no_debit",
+      "group": "domain_scope",
+      "when": { "decline_family": "pre_failure" },
+      "verdict": "block",
+      "blocks_actions": ["schedule_retry", "defer_to_gateway"],
+      "source": "Detector-originated recurring case: nothing has failed yet, the scheduled charge will run on its own. Any extra debit would be an unauthorised duplicate under the RBI e-mandate (one debit per billing cycle per mandate).",
+      "overridable": false,
+      "note": "Pre-failure cases are contact-only: warn the customer / fix the mandate before the scheduled debit."
+    },
+    {
+      "id": "non_recurring_no_debit",
+      "group": "domain_scope",
+      "when": { "domain": { "in": ["checkout", "receivables"] } },
+      "verdict": "block",
+      "blocks_actions": ["schedule_retry", "defer_to_gateway", "mandate_reregister"],
+      "source": "No mandate exists for an abandoned checkout or an invoice; the merchant has no authority to pull funds. Recovery is a customer-initiated payment via link only.",
+      "overridable": false,
+      "note": "Checkout and receivables domains are contact-only by construction."
+    },
+    {
+      "id": "fraud_flag_block_all",
+      "group": "consent_fraud",
+      "when": { "fraud_flag": true },
+      "verdict": "block",
+      "blocks_actions": ["schedule_retry", "defer_to_gateway", "dunning_email", "dunning_whatsapp", "mandate_reregister"],
+      "leaves_allowed": ["escalate_human", "noop"],
+      "source": "Merchant risk policy / platform fraud control. Razorpay Agent Studio: fraud-flagged customers receive no automated contact.",
+      "overridable": false,
+      "note": "A suspected-fraud event is never auto-recovered or contacted. Human-only."
+    },
+    {
+      "id": "customer_opted_out_block_contact",
+      "group": "consent_fraud",
+      "when": { "customer_opted_out": true },
+      "verdict": "block",
+      "blocks_actions": ["dunning_email", "dunning_whatsapp", "mandate_reregister"],
+      "source": "DPDPA 2023 consent; TRAI TCCCPR. A recorded opt-out is permanent suppression.",
+      "overridable": false,
+      "note": "Opt-out blocks all outreach. Money-moving may still be gateway-owned but customer-action paths are dead."
+    },
+
+    {
+      "id": "mandate_cancelled_require_reregister",
+      "group": "mandate_lifecycle",
+      "when": { "mandate_status": "cancelled" },
+      "verdict": "require_action",
+      "blocks_actions": ["schedule_retry", "defer_to_gateway"],
+      "requires": "mandate_reregister",
+      "source": "RBI Digital Payments E-mandate Framework 2026 - a revoked/cancelled mandate confers no debit authority. Withdrawal requires AFA.",
+      "overridable": false,
+      "note": "Never retry a cancelled mandate. Only path is fresh AFA registration by the customer."
+    },
+    {
+      "id": "mandate_halted_no_autocharge",
+      "group": "mandate_lifecycle",
+      "when": { "mandate_status": "halted" },
+      "verdict": "require_action",
+      "blocks_actions": ["schedule_retry", "defer_to_gateway"],
+      "requires": "mandate_reregister",
+      "source": "Razorpay Subscriptions states - in `halted`, invoices generate but no auto-charge is attempted; prior invoices are not re-charged on reactivation.",
+      "overridable": false,
+      "note": "Halted = retries already exhausted. No auto-charge. Customer must update card / re-authenticate."
+    },
+    {
+      "id": "subscription_halted_event",
+      "group": "mandate_lifecycle",
+      "when": { "event_type": "subscription.halted" },
+      "verdict": "require_action",
+      "blocks_actions": ["schedule_retry", "defer_to_gateway"],
+      "requires": "mandate_reregister",
+      "source": "Razorpay Subscriptions states.",
+      "overridable": false,
+      "note": "Same as mandate_halted but keyed on the event type when mandate_status is not populated."
+    },
+    {
+      "id": "mandate_paused_defer",
+      "group": "mandate_lifecycle",
+      "when": { "mandate_status": "paused" },
+      "verdict": "defer",
+      "blocks_actions": ["schedule_retry", "defer_to_gateway"],
+      "source": "RBI E-mandate Framework 2026 - customer may pause/modify a mandate; no debit while paused.",
+      "overridable": false,
+      "note": "Do not retry while paused. Re-evaluate if/when resumed."
+    },
+    {
+      "id": "no_mandate_require_registration",
+      "group": "mandate_lifecycle",
+      "when": { "mandate_status": { "in": ["none", "absent", "not_registered"] } },
+      "verdict": "require_action",
+      "blocks_actions": ["schedule_retry", "defer_to_gateway"],
+      "requires": "mandate_reregister",
+      "source": "RBI E-mandate Framework 2026 - first transaction / registration requires AFA validation.",
+      "overridable": false,
+      "note": "No mandate on file = no off-session debit authority."
+    },
+
+    {
+      "id": "rbi_afa_high_value_general",
+      "group": "rbi_emandate",
+      "when": { "domain": "recurring", "amount_paise": { "gt": 1500000 }, "mandate_category": { "not_in": ["insurance", "mutual_fund", "credit_card_bill"] } },
+      "verdict": "require_action",
+      "blocks_actions": ["schedule_retry", "defer_to_gateway"],
+      "requires": "mandate_reregister",
+      "source": "RBI E-mandate Framework 2026 - recurring debits above Rs 15,000 require AFA on each transaction (general category).",
+      "overridable": false,
+      "note": "Above Rs 15,000 there is no silent auto-debit; each charge needs per-transaction AFA."
+    },
+    {
+      "id": "rbi_afa_high_value_exempt_category",
+      "group": "rbi_emandate",
+      "when": { "domain": "recurring", "amount_paise": { "gt": 10000000 }, "mandate_category": { "in": ["insurance", "mutual_fund", "credit_card_bill"] } },
+      "verdict": "require_action",
+      "blocks_actions": ["schedule_retry", "defer_to_gateway"],
+      "requires": "mandate_reregister",
+      "source": "RBI E-mandate Framework 2026 - Rs 1,00,000 AFA-free ceiling for insurance premiums, mutual fund subscriptions, credit-card bill payments.",
+      "overridable": false,
+      "note": "Exempt categories get the higher Rs 1,00,000 threshold before per-transaction AFA is required."
+    },
+    {
+      "id": "rbi_pre_debit_notice_not_sent",
+      "group": "rbi_emandate",
+      "when": { "pre_debit_notice_sent": false },
+      "verdict": "block",
+      "blocks_actions": ["schedule_retry"],
+      "source": "RBI E-mandate Framework 2026 - issuer must send pre-debit notification at least 24h before any recurring debit. A debit without prior notice is rejected outright, not soft-declined.",
+      "overridable": false,
+      "note": "No notice -> no MERCHANT-initiated debit. defer_to_gateway is exempt: the gateway owns its own pre-debit compliance (F1)."
+    },
+    {
+      "id": "rbi_pre_debit_window_not_elapsed",
+      "group": "rbi_emandate",
+      "when": { "hours_since_pre_debit_notice": { "lt": 24 } },
+      "verdict": "defer",
+      "blocks_actions": ["schedule_retry"],
+      "source": "RBI E-mandate Framework 2026 - minimum 24h between pre-debit notice and debit.",
+      "overridable": false,
+      "note": "Notice sent but 24h not elapsed. Defer the debit until the window closes."
+    },
+    {
+      "id": "rbi_min_24h_before_represent",
+      "group": "rbi_emandate",
+      "when": { "hours_since_last_failed_debit": { "lt": 24 } },
+      "verdict": "defer",
+      "blocks_actions": ["schedule_retry"],
+      "source": "RBI E-mandate Framework 2026 / NPCI - minimum 24h before re-presenting a failed mandate execution, and each retry needs a fresh 24h pre-debit notice.",
+      "overridable": false,
+      "note": "No same-day re-presentation. Each retry restarts the 24h notice clock."
+    },
+
+    {
+      "id": "hard_decline_no_retry",
+      "group": "scheme_rail",
+      "when": { "decline_family": "hard" },
+      "verdict": "block",
+      "blocks_actions": ["schedule_retry", "defer_to_gateway"],
+      "source": "Card scheme rules - hard declines (expired card, invalid account, 'do not retry' response codes) will not succeed on re-presentment; Visa/Mastercard levy excessive-reattempt fees. Gateways do not auto-retry hard declines.",
+      "overridable": false,
+      "note": "Never retry a hard decline. Only customer action (update card / re-register) can recover it (F4 - found by batch simulation)."
+    },
+    {
+      "id": "gateway_owns_soft_retry",
+      "group": "scheme_rail",
+      "when": { "retry_owner": "gateway", "decline_family": "soft" },
+      "verdict": "defer",
+      "blocks_actions": ["schedule_retry"],
+      "source": "Razorpay Subscriptions - gateway auto-retries soft declines (T+1/2/3). Duplicating merchant retries wastes attempts and scheme goodwill.",
+      "overridable": false,
+      "note": "Let the gateway own the soft-decline retry. Only build custom retry if gateway timing provably misses payday (a policy/heuristic decision, not a constraint)."
+    },
+    {
+      "id": "card_network_represent_cap",
+      "group": "scheme_rail",
+      "when": { "rail": "card", "network_retries_30d": { "gte": "network_cap" } },
+      "verdict": "block",
+      "blocks_actions": ["schedule_retry", "defer_to_gateway"],
+      "source": "Card scheme re-presentment caps - Visa 15 per 30 days, Mastercard 10 per 35 days (defaults; exact cap resolved from card_network).",
+      "overridable": false,
+      "note": "Beyond the scheme cap, further retries risk penalties/fines. Route to customer action."
+    },
+    {
+      "id": "upi_autopay_amount_cap",
+      "group": "scheme_rail",
+      "when": { "domain": "recurring", "rail": "upi", "amount_paise": { "gt": 1500000 } },
+      "verdict": "require_action",
+      "blocks_actions": ["schedule_retry", "defer_to_gateway"],
+      "requires": "mandate_reregister",
+      "source": "NPCI UPI AutoPay - general recurring cap Rs 15,000 per transaction without per-debit UPI PIN. Above this UPI cannot silently auto-debit.",
+      "overridable": false,
+      "note": "UPI AutoPay above Rs 15,000 needs per-debit UPI PIN. Consider offering an alternate rail on re-registration."
+    },
+
+    {
+      "id": "trai_quiet_hours",
+      "group": "comms_trai",
+      "when": { "intended_send_ist_hour": { "outside": [9, 21] } },
+      "verdict": "block",
+      "blocks_actions": ["dunning_whatsapp"],
+      "leaves_allowed": ["dunning_email"],
+      "source": "TRAI TCCCPR 2018 - promotional voice/SMS restricted to 09:00-21:00. Applied to promotional WhatsApp/SMS/voice; transactional email exempt.",
+      "overridable": false,
+      "note": "In quiet hours, defer promotional outreach to 09:00 IST; email still allowed."
+    },
+    {
+      "id": "trai_dnd_promotional",
+      "group": "comms_trai",
+      "when": { "customer_dnd": true },
+      "verdict": "block",
+      "blocks_actions": ["dunning_whatsapp"],
+      "leaves_allowed": ["dunning_email"],
+      "source": "TRAI DND registry - blocks promotional SMS/voice. Transactional email and consented transactional messages survive.",
+      "overridable": false,
+      "note": "DND suppresses promotional SMS/voice/WhatsApp. Use email for these customers."
+    },
+    {
+      "id": "comms_frequency_cap",
+      "group": "comms_trai",
+      "when": { "contacts_last_7d": { "gte": 3 } },
+      "verdict": "block",
+      "blocks_actions": ["dunning_email", "dunning_whatsapp", "mandate_reregister"],
+      "source": "Comms policy (TRAI-aligned anti-harassment) - max 3 contacts per customer per rolling 7 days.",
+      "overridable": false,
+      "note": "Hard cap on outreach frequency. Prevents customer harassment."
+    },
+    {
+      "id": "comms_min_gap",
+      "group": "comms_trai",
+      "when": { "hours_since_last_contact": { "lt": 12 } },
+      "verdict": "defer",
+      "blocks_actions": ["dunning_email", "dunning_whatsapp", "mandate_reregister"],
+      "source": "Comms policy (TRAI-aligned) - minimum 12h gap between outreach touches.",
+      "overridable": false,
+      "note": "Space out contact. Defer until 12h since last touch."
+    },
+
+    {
+      "id": "idempotency_duplicate_event",
+      "group": "idempotency_stopping",
+      "when": { "payment_id_in_processed": true },
+      "verdict": "block",
+      "blocks_actions": ["schedule_retry", "defer_to_gateway", "dunning_email", "dunning_whatsapp", "mandate_reregister", "escalate_human"],
+      "leaves_allowed": ["noop"],
+      "source": "Idempotency (internal) - webhooks are at-least-once. A payment_id already processed must not trigger a second action.",
+      "overridable": false,
+      "note": "Duplicate delivery -> noop. Mirrors gate G3_IDEMPOTENT."
+    },
+    {
+      "id": "attempts_exhausted_stop",
+      "group": "idempotency_stopping",
+      "when": { "attempts_used": { "gte": "max_attempts_for_class" } },
+      "verdict": "block",
+      "blocks_actions": ["schedule_retry", "defer_to_gateway"],
+      "source": "Policy + scheme caps - once per-class retry budget is spent, further silent retries are wasteful. Route to customer action or dunning.",
+      "overridable": false,
+      "note": "Retry budget exhausted: no more debits (merchant or gateway). NOT a require_action - the mandate may still be live, so the planner picks the cheapest contact (email before re-register) (F3)."
+    }
+  ]
+}

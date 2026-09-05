@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "defaults": {
+    "unknown_decline": "escalate_human",
+    "retry_owner_gateway": "defer_to_gateway"
+  },
+  "rules": [
+    {
+      "id": "soft_insufficient_funds_merchant_retry",
+      "when": {
+        "decline_class": "insufficient_funds",
+        "decline_family": "soft",
+        "retry_owner": "merchant"
+      },
+      "action": "schedule_retry",
+      "strategy": "immediate_then_payday",
+      "max_attempts": 3,
+      "fallback": "dunning_email"
+    },
+    {
+      "id": "soft_insufficient_funds_hybrid",
+      "when": {
+        "decline_class": "insufficient_funds",
+        "decline_family": "soft",
+        "retry_owner": "hybrid"
+      },
+      "action": "schedule_retry",
+      "strategy": "immediate_then_payday",
+      "max_attempts": 2,
+      "note": "Supplement gateway T+1/2/3 — schedule only payday+1 attempts",
+      "fallback": "dunning_whatsapp"
+    },
+    {
+      "id": "soft_insufficient_funds_gateway",
+      "when": {
+        "decline_class": "insufficient_funds",
+        "decline_family": "soft",
+        "retry_owner": "gateway"
+      },
+      "action": "defer_to_gateway",
+      "fallback": "dunning_email",
+      "note": "Log timing; only build custom retry if gateway retries miss payday"
+    },
+    {
+      "id": "hard_card_expired",
+      "when": {
+        "decline_class": "card_expired",
+        "decline_family": "hard"
+      },
+      "action": "dunning_email",
+      "fallback": "mandate_reregister",
+      "retry_allowed": false
+    },
+    {
+      "id": "hard_mandate_cancelled",
+      "when": {
+        "decline_class": "mandate_cancelled",
+        "decline_family": "hard"
+      },
+      "action": "mandate_reregister",
+      "channel": "whatsapp",
+      "retry_allowed": false
+    },
+    {
+      "id": "upi_mandate_halted",
+      "when": {
+        "rail": "upi",
+        "mandate_status": "halted"
+      },
+      "action": "dunning_whatsapp",
+      "retry_allowed": false
+    },
+    {
+      "id": "subscription_halted",
+      "when": {
+        "event_type": "subscription.halted"
+      },
+      "action": "dunning_whatsapp",
+      "note": "Previous invoices not auto-charged on reactivation"
+    }
+  ]
+}

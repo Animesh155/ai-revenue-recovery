@@ -1,0 +1,29 @@
+# Demo commands — copy ONE line at a time into Terminal
+# cwd must be: /Users/animeshswet/razorpay exp
+# Use python3 (not python)
+
+cd "/Users/animeshswet/razorpay exp"
+
+# 0) optional: clear stale sample case if run-event says duplicate/noop
+rm -f cases/sub_sample_insufficient_funds.json
+
+# 1) live failure → shield → plan
+python3 -m agent.runtime run-event agent/samples/subscription.pending.insufficient_funds.json --now 2026-09-04T13:19:00+05:30
+
+# 2) detect revenue at risk
+python3 -m agent.runtime detect agent/samples/snapshot.mixed.json --run
+
+# 3) batch measured money
+python3 -m agent.runtime simulate --n 100 --seed 3 --batch demo-n100-s3
+
+# 4) audit trail
+python3 -m agent.runtime verify-audit batches/demo-n100-s3/audit.log
+
+# 5) report (if you want the markdown on screen again)
+python3 -m agent.runtime report --batch demo-n100-s3
+
+# 6) stopping example case
+python3 -m json.tool batches/demo-n100-s3/cases/sub_0013.json
+
+# 7) optional: golden tests
+python3 -m agent.runtime test

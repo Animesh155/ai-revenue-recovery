@@ -1,0 +1,71 @@
+{
+  "event": "snapshot",
+  "occurred_at": "2026-09-04T10:00:00+05:30",
+  "_note": "What a periodic poll of Razorpay Subscriptions / Tokens / Invoices / Orders would return, flattened. Feed to: python -m agent.runtime detect agent/samples/snapshot.mixed.json --run",
+  "entities": [
+    {
+      "entity_type": "subscription",
+      "entity": {
+        "id": "sub_card_exp_01", "status": "active", "payment_method": "card", "card_expiry": "2026-09",
+        "next_charge_at": "2026-09-20T09:00:00+05:30", "next_charge_amount_paise": 99900,
+        "mandate_end_at": "2027-09-01T00:00:00+05:30", "mandate_max_amount_paise": 500000,
+        "context": { "customer_dnd": false }
+      }
+    },
+    {
+      "entity_type": "subscription",
+      "entity": {
+        "id": "sub_mandate_exp_02", "status": "active", "payment_method": "upi",
+        "next_charge_at": "2026-09-12T09:00:00+05:30", "next_charge_amount_paise": 49900,
+        "mandate_end_at": "2026-09-10T00:00:00+05:30", "mandate_max_amount_paise": 100000
+      }
+    },
+    {
+      "entity_type": "subscription",
+      "entity": {
+        "id": "sub_max_breach_03", "status": "active", "payment_method": "upi",
+        "next_charge_at": "2026-09-15T09:00:00+05:30", "next_charge_amount_paise": 249900,
+        "mandate_end_at": "2027-01-01T00:00:00+05:30", "mandate_max_amount_paise": 200000
+      }
+    },
+    {
+      "entity_type": "subscription",
+      "entity": {
+        "id": "sub_afa_04", "status": "active", "payment_method": "card", "card_expiry": "2028-01",
+        "next_charge_at": "2026-09-10T09:00:00+05:30", "next_charge_amount_paise": 2500000,
+        "mandate_end_at": "2027-09-01T00:00:00+05:30", "mandate_max_amount_paise": 5000000, "afa_scheduled": false
+      }
+    },
+    {
+      "entity_type": "subscription",
+      "entity": {
+        "id": "sub_healthy_05", "status": "active", "payment_method": "card", "card_expiry": "2028-06",
+        "next_charge_at": "2026-09-25T09:00:00+05:30", "next_charge_amount_paise": 99900,
+        "mandate_end_at": "2027-09-01T00:00:00+05:30", "mandate_max_amount_paise": 500000
+      }
+    },
+    {
+      "entity_type": "subscription",
+      "entity": {
+        "id": "sub_stale_pending_06", "status": "pending", "status_since": "2026-08-31T09:00:00+05:30",
+        "payment_method": "card", "next_charge_amount_paise": 199900
+      }
+    },
+    {
+      "entity_type": "invoice",
+      "entity": { "id": "inv_due_07", "status": "issued", "due_at": "2026-09-06T00:00:00+05:30", "amount_due_paise": 1250000, "customer_id": "cust_b2b_1" }
+    },
+    {
+      "entity_type": "invoice",
+      "entity": { "id": "inv_overdue_08", "status": "partially_paid", "due_at": "2026-08-20T00:00:00+05:30", "amount_due_paise": 4800000, "customer_id": "cust_b2b_2" }
+    },
+    {
+      "entity_type": "order",
+      "entity": { "id": "order_aband_09", "status": "attempted", "created_at": "2026-09-04T08:15:00+05:30", "amount_paise": 349900, "contact": "+91XXXXXXXXXX", "context": { "customer_dnd": false } }
+    },
+    {
+      "entity_type": "order",
+      "entity": { "id": "order_fresh_10", "status": "created", "created_at": "2026-09-04T09:50:00+05:30", "amount_paise": 59900, "contact": "+91XXXXXXXXXX" }
+    }
+  ]
+}

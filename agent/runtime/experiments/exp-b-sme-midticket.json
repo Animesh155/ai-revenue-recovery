@@ -1,0 +1,87 @@
+{
+  "_provenance": "EXPERIMENT B — deliberately different population & ticket mix from the default declared model. Still synthetic_declared; not observed behaviour. Purpose: show that headline ₹ moves with cohort composition, while constraint violations stay 0.",
+  "outcome_source_tag": "synthetic_declared",
+  "experiment": {
+    "id": "exp-b-sme-midticket",
+    "hypothesis": "More mid/high-ticket soft declines + fewer detector fat-tails + more hard declines → lower agent-attributed share, similar structural soundness (0 violations)."
+  },
+  "population": {
+    "origin_mix": { "webhook": 0.85, "detector": 0.15 },
+    "detector_class_mix": {
+      "risk_card_expiring": 0.35,
+      "risk_mandate_expiring": 0.15,
+      "risk_mandate_max_breach": 0.05,
+      "risk_afa_required": 0.05,
+      "invoice_due_soon": 0.15,
+      "invoice_overdue": 0.15,
+      "checkout_abandoned": 0.10
+    },
+    "detector_domain": {
+      "risk_card_expiring": "recurring",
+      "risk_mandate_expiring": "recurring",
+      "risk_mandate_max_breach": "recurring",
+      "risk_afa_required": "recurring",
+      "invoice_due_soon": "receivables",
+      "invoice_overdue": "receivables",
+      "checkout_abandoned": "checkout"
+    },
+    "decline_class_mix": {
+      "insufficient_funds": 0.40,
+      "card_expired": 0.22,
+      "do_not_honour": 0.20,
+      "mandate_cancelled": 0.13,
+      "unknown": 0.05
+    },
+    "rail_mix": { "card": 0.45, "upi": 0.55 },
+    "amount_paise_choices": [9900, 29900, 79900, 149900, 299900, 999900],
+    "amount_weights":       [0.15, 0.30, 0.30, 0.15, 0.08, 0.02],
+    "card_network_mix": { "visa": 0.4, "mastercard": 0.4, "rupay": 0.2 },
+    "flags": { "customer_dnd_true": 0.20, "customer_dnd_unknown": 0.40, "customer_opted_out": 0.05, "fraud_flag": 0.03 },
+    "error_descriptions": {
+      "insufficient_funds": "Your account has insufficient balance to complete this transaction",
+      "card_expired": "The card has expired",
+      "do_not_honour": "Transaction declined by the bank (do not honour)",
+      "mandate_cancelled": "Mandate has been cancelled by the customer",
+      "unknown": "Payment processing failed"
+    }
+  },
+  "response": {
+    "_comment": "Slightly colder contact response than default model; gateway soft-retry a bit warmer. Still distinct from planner priors.",
+    "insufficient_funds": {
+      "defer_to_gateway":   { "p_success": [0.28, 0.16, 0.09], "delay_hours": 24 },
+      "schedule_retry":     { "p_success": [0.24, 0.12, 0.06], "delay_hours": 24 },
+      "dunning_email":      { "p_success": [0.04, 0.02],       "delay_hours": 36 },
+      "dunning_whatsapp":   { "p_success": [0.09, 0.04],       "delay_hours": 30 },
+      "mandate_reregister": { "p_success": [0.07, 0.03],       "delay_hours": 60 }
+    },
+    "card_expired": {
+      "defer_to_gateway":   { "p_success": [0.0], "delay_hours": 24 },
+      "schedule_retry":     { "p_success": [0.0], "delay_hours": 24 },
+      "dunning_email":      { "p_success": [0.06, 0.03], "delay_hours": 48 },
+      "dunning_whatsapp":   { "p_success": [0.11, 0.05], "delay_hours": 36 },
+      "mandate_reregister": { "p_success": [0.16, 0.08], "delay_hours": 60 }
+    },
+    "do_not_honour": {
+      "defer_to_gateway":   { "p_success": [0.08, 0.04, 0.02], "delay_hours": 24 },
+      "schedule_retry":     { "p_success": [0.08, 0.04, 0.02], "delay_hours": 24 },
+      "dunning_email":      { "p_success": [0.03, 0.015], "delay_hours": 48 },
+      "dunning_whatsapp":   { "p_success": [0.06, 0.03], "delay_hours": 36 },
+      "mandate_reregister": { "p_success": [0.08, 0.04], "delay_hours": 60 }
+    },
+    "mandate_cancelled": {
+      "mandate_reregister": { "p_success": [0.12, 0.05], "delay_hours": 72 },
+      "dunning_email":      { "p_success": [0.015, 0.008], "delay_hours": 48 },
+      "dunning_whatsapp":   { "p_success": [0.025, 0.01], "delay_hours": 36 }
+    },
+    "unknown": {},
+    "risk_card_expiring":     { "dunning_email": { "p_success": [0.18, 0.08], "delay_hours": 48 }, "dunning_whatsapp": { "p_success": [0.24, 0.11], "delay_hours": 36 }, "mandate_reregister": { "p_success": [0.28, 0.14], "delay_hours": 60 } },
+    "risk_mandate_expiring":  { "dunning_email": { "p_success": [0.14, 0.06], "delay_hours": 48 }, "mandate_reregister": { "p_success": [0.26, 0.12], "delay_hours": 60 } },
+    "risk_mandate_max_breach":{ "dunning_email": { "p_success": [0.12, 0.05], "delay_hours": 48 }, "mandate_reregister": { "p_success": [0.22, 0.10], "delay_hours": 60 } },
+    "risk_afa_required":      { "dunning_email": { "p_success": [0.32, 0.16], "delay_hours": 48 }, "dunning_whatsapp": { "p_success": [0.36, 0.18], "delay_hours": 36 }, "mandate_reregister": { "p_success": [0.34, 0.16], "delay_hours": 48 } },
+    "checkout_abandoned":     { "dunning_email": { "p_success": [0.04, 0.015], "delay_hours": 24 }, "dunning_whatsapp": { "p_success": [0.06, 0.03], "delay_hours": 12 } },
+    "invoice_due_soon":       { "dunning_email": { "p_success": [0.22, 0.10], "delay_hours": 72 }, "dunning_whatsapp": { "p_success": [0.18, 0.09], "delay_hours": 48 } },
+    "invoice_overdue":        { "dunning_email": { "p_success": [0.12, 0.06], "delay_hours": 72 }, "dunning_whatsapp": { "p_success": [0.16, 0.08], "delay_hours": 48 }, "escalate_human": { "p_success": [0.20], "delay_hours": 120 } }
+  },
+  "gateway": { "halt_after_failed_debits": 3 },
+  "organic_recovery_per_day": 0.003
+}

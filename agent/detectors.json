@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "purpose": "DETECT revenue at risk BEFORE a failure webhook exists. Rules evaluate periodic snapshots of subscriptions / tokens / invoices / orders (what you would poll from Razorpay APIs) and emit `risk.*` events. Each risk event opens a case in the normal loop with decline_family=pre_failure (recurring) or a non-recurring domain, so the shield + planner + ledger apply unchanged.",
+  "meta": {
+    "input": "snapshot events: { event: 'snapshot', entity_type: subscription|token|invoice|order, entity: {...}, occurred_at }",
+    "output": "risk events: { event: 'risk.<rule_id>', domain, subscription_id|invoice_id|order_id, amount_paise, occurred_at, payload }",
+    "evaluation": "Every rule whose `when` matches emits one risk event (deduped per entity+rule per day via processed ids). Money-moving actions are blocked on all pre-failure / non-recurring cases by the shield.",
+    "domains": {
+      "recurring": "subscription/mandate revenue (India e-mandate rules apply)",
+      "checkout": "one-off order abandoned before payment (no mandate; comms + consent rules apply)",
+      "receivables": "B2B/B2C invoices approaching or past due (no mandate; comms + consent rules apply)"
+    }
+  },
+  "rules": [
+    {
+      "id": "card_expiring_before_next_charge",
+      "domain": "recurring",
+      "entity_type": "subscription",
+      "when": { "payment_method": "card", "card_expiry_days_from_now": { "lte": 30 }, "next_charge_days_from_now": { "lte": 30 }, "status": { "in": ["active", "authenticated"] } },
+      "amount_field": "next_charge_amount_paise",
+      "risk_class": "risk_card_expiring",
+      "source": "Card networks decline charges on expired cards (hard decline). RBI tokenization: token expiry follows card expiry; merchant must collect fresh card + AFA.",
+      "suggested_path": "pre-emptive dunning_email -> mandate_reregister (update card)"
+    },
+    {
+      "id": "mandate_expiring_before_next_charge",
+      "domain": "recurring",
+      "entity_type": "subscription",
+      "when": { "mandate_end_days_from_now": { "lte": 15 }, "next_charge_days_from_now": { "lte": 15 }, "status": { "in": ["active", "authenticated"] } },
+      "amount_field": "next_charge_amount_paise",
+      "risk_class": "risk_mandate_expiring",
+      "source": "RBI e-mandate: a mandate has a fixed validity; debits after end date are rejected. Renewal requires fresh AFA.",
+      "suggested_path": "mandate_reregister"
+    },
+    {
+      "id": "next_charge_exceeds_mandate_max",
+      "domain": "recurring",
+      "entity_type": "subscription",
+      "when": { "next_charge_amount_paise": { "gt": "mandate_max_amount_paise" } },
+      "amount_field": "next_charge_amount_paise",
+      "risk_class": "risk_mandate_max_breach",
+      "source": "NPCI UPI AutoPay / RBI e-mandate: debit above the registered max amount is rejected. Needs mandate modification with AFA.",
+      "suggested_path": "mandate_reregister (modify max amount)"
+    },
+    {
+      "id": "next_charge_needs_per_txn_afa",
+      "domain": "recurring",
+      "entity_type": "subscription",
+      "when": { "next_charge_amount_paise": { "gt": 1500000 }, "mandate_category": { "not_in": ["insurance", "mutual_fund", "credit_card_bill"] }, "afa_scheduled": false },
+      "amount_field": "next_charge_amount_paise",
+      "risk_class": "risk_afa_required",
+      "source": "RBI E-mandate Framework - recurring debits above Rs 15,000 (general) need per-transaction AFA; a silent debit will be rejected.",
+      "suggested_path": "dunning_email / whatsapp with AFA link ahead of charge date"
+    },
+    {
+      "id": "subscription_pending_stale",
+      "domain": "recurring",
+      "entity_type": "subscription",
+      "when": { "status": "pending", "hours_in_status": { "gte": 72 } },
+      "amount_field": "next_charge_amount_paise",
+      "risk_class": "insufficient_funds",
+      "source": "Razorpay Subscriptions: `pending` means a charge failed and retries are in progress; 72h without a webhook usually means a missed/undelivered webhook.",
+      "suggested_path": "normal soft-decline path (defer_to_gateway -> dunning)",
+      "note": "Reuses the reactive class so the same priors apply; origin=detector distinguishes it in the report."
+    },
+    {
+      "id": "invoice_due_soon",
+      "domain": "receivables",
+      "entity_type": "invoice",
+      "when": { "status": { "in": ["issued", "partially_paid"] }, "due_days_from_now": { "lte": 3, "gte": 0 } },
+      "amount_field": "amount_due_paise",
+      "risk_class": "invoice_due_soon",
+      "source": "Receivables practice: a reminder 1-3 days before due date is the cheapest intervention; MSMED Act 2006 s.15 caps agreed credit at 45 days for MSME suppliers.",
+      "suggested_path": "dunning_email (payment link)"
+    },
+    {
+      "id": "invoice_overdue",
+      "domain": "receivables",
+      "entity_type": "invoice",
+      "when": { "status": { "in": ["issued", "partially_paid"] }, "due_days_from_now": { "lt": 0 } },
+      "amount_field": "amount_due_paise",
+      "risk_class": "invoice_overdue",
+      "source": "Receivables: overdue invoice. Escalation ladder email -> whatsapp -> AR human. Interest per MSMED Act s.16 where applicable.",
+      "suggested_path": "dunning_email -> dunning_whatsapp -> escalate_human"
+    },
+    {
+      "id": "checkout_abandoned",
+      "domain": "checkout",
+      "entity_type": "order",
+      "when": { "status": { "in": ["created", "attempted"] }, "minutes_since_created": { "gte": 30 }, "has_contact": true },
+      "amount_field": "amount_paise",
+      "risk_class": "checkout_abandoned",
+      "source": "Razorpay Magic Checkout / abandoned-cart recovery: order created or attempted but not paid. Contact requires prior consent (DPDPA) and TRAI comms rules.",
+      "suggested_path": "dunning_email / dunning_whatsapp with payment link; no debit possible"
+    }
+  ]
+}
