@@ -1,6 +1,4 @@
-# AI Revenue Recovery Agent
-
-Hackathon-style agent for **Track 03: AI Revenue Recovery** — find revenue that’s slipping away and win it back.
+AI Revenue Recovery** — find revenue that’s slipping away and win it back.
 
 It runs a bounded loop:
 
@@ -20,12 +18,6 @@ Designed around India / Razorpay-shaped recurring payments (e-mandate / AFA / so
 | **Audit** | Hash-chained log of decisions |
 | **Ledger** | Batch report: ₹ at risk / recovered, split **gateway / agent / organic** |
 
-### The bar
-
-- Measured money recovered across a batch  
-- Compliant escalation  
-- Stopping rules (EV floor, max uses, horizon)  
-- Audit trail  
 
 ## Layout
 
